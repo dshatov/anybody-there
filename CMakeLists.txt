@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.10)
+project(raylib_game)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
+
+include_directories(${PROJECT_SOURCE_DIR}/src)
+file(GLOB_RECURSE SOURCES src/*.c src/*.cpp)
+file(GLOB_RECURSE HEADERS src/*.h src/*.hpp)
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+set(RAYLIB_DIR ${CMAKE_SOURCE_DIR}/third-party/raylib)
+if (EMSCRIPTEN)
+    set(PLATFORM Web)
+    set(CMAKE_TOOLCHAIN_FILE ${RAYLIB_DIR}/cmake/emscripten.cmake)
+    add_definitions(-DPLATFORM_WEB)
+    if (WASM)
+        add_definitions(-DUSE_WASM)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s WASM=1")
+    else ()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s WASM=0")
+    endif ()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --bind --memory-init-file 0 -s INITIAL_MEMORY=512MB -s SAFE_HEAP=0")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_GLFW=3 -s USE_WEBGL2=1 -s FORCE_FILESYSTEM=0")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ASSERTIONS=0")
+    #    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s DISABLE_EXCEPTION_CATCHING=0")
+    #    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ASYNCIFY=1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --use-preload-plugins")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --embed-file data@/")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s USE_SDL=2")
+    file(COPY data DESTINATION ${CMAKE_BINARY_DIR}/)
+    file(COPY data/index.html DESTINATION ${CMAKE_BINARY_DIR}/)
+    set(CMAKE_EXECUTABLE_SUFFIX ".js")
+endif ()
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+set(OpenGL_GL_PREFERENCE GLVND)
+add_subdirectory(${RAYLIB_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC SYSTEM ${RAYLIB_DIR}/src)
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+target_link_libraries(${PROJECT_NAME} raylib)
