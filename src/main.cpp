@@ -285,7 +285,8 @@ static struct {
                 "Controls:\n\n"
                 "ARROWS  --  move\n"
                 #ifndef PLATFORM_WEB
-                //                "F  --  fullscreen\n"
+                "F  --  toggle fullscreen\n"
+                "ESC  --  exit fullscreen\n"
                 #endif
                 "H  --  show help\n"
                 "\n"
@@ -600,12 +601,14 @@ void toggleFullscreen() {
 }
 
 void update() {
-//    if (IsKeyPressed(KEY_F)) toggleFullscreen();
-//    else if (IsKeyPressed(KEY_ESCAPE)) {
-//        if (IsWindowFullscreen()) {
-//            toggleFullscreen();
-//        }
-//    }
+#ifndef PLATFORM_WEB
+    if (IsKeyPressed(KEY_F)) toggleFullscreen();
+    else if (IsKeyPressed(KEY_ESCAPE)) {
+        if (IsWindowFullscreen()) {
+            toggleFullscreen();
+        }
+    }
+#endif
     HELP.show = IsKeyDown(KEY_H);
     MESSAGES.update();
     MUSIC.update();
@@ -683,7 +686,7 @@ void init() {
     SetTargetFPS(60);
     screen = LoadRenderTexture(LOGIC_SCREEN_WIDTH, LOGIC_SCREEN_HEIGHT);
     SetTextureFilter(screen.texture, FILTER_TRILINEAR);
-#ifndef PLATFORM_WEB
+#ifdef _WIN32
     toggleFullscreen();
 #endif
     SetExitKey(0);
