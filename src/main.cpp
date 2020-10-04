@@ -466,18 +466,18 @@ void startLevel(
 
 void startLevel01() {
     NEXTNEXT = startLevel02;
-    startLevel(0, 15, 100 - 5 * LVL); // TODO
+    startLevel(0, 15, 100 - 5 * LVL);
 }
 
 
 void startLevel02() {
     NEXTNEXT = startLevel03;
-    startLevel(1, 15 + 5 * LVL, 70 - 10 * LVL);
+    startLevel(1, 15 + 5 * LVL, 70 - 5 * LVL);
 }
 
 void startLevel03() {
     NEXTNEXT = startTransitionLevel;
-    startLevel(2, 30 + 5 * LVL, 60 - 10 * LVL);
+    startLevel(2, 30 + 5 * LVL, 45 - 2 * LVL);
 }
 
 
@@ -507,11 +507,10 @@ bool trans01() {
 
     PLAYER.hp = 2;
     CALLBACKS.clear();
-    MESSAGES.add(".");
-    MESSAGES.add("..");
-    MESSAGES.add("...");
-    MESSAGES.add("*** ......llo?");
-    MESSAGES.add("...............", trans02);
+    MESSAGES.add("WAIT ***************************");
+    MESSAGES.add("WAIT A ****************************************************");
+    MESSAGES.add("WAIT A WHILE . . . . . . *************************************************************");
+    MESSAGES.add("*** ......llo?", trans02);
 
     return true;
 }
