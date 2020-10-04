@@ -284,7 +284,7 @@ static struct {
                 "Controls:\n\n"
                 "ARROWS  --  move\n"
                 #ifndef PLATFORM_WEB
-                "F  --  fullscreen\n"
+//                "F  --  fullscreen\n"
                 #endif
                 "H  --  show help\n"
                 "\n"
@@ -579,12 +579,12 @@ void toggleFullscreen() {
 }
 
 void update() {
-    if (IsKeyPressed(KEY_F)) toggleFullscreen();
-    else if (IsKeyPressed(KEY_ESCAPE)) {
-        if (IsWindowFullscreen()) {
-            toggleFullscreen();
-        }
-    }
+//    if (IsKeyPressed(KEY_F)) toggleFullscreen();
+//    else if (IsKeyPressed(KEY_ESCAPE)) {
+//        if (IsWindowFullscreen()) {
+//            toggleFullscreen();
+//        }
+//    }
     HELP.show = IsKeyDown(KEY_H);
     MESSAGES.update();
     MUSIC.update();
