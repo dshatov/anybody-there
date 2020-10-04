@@ -101,6 +101,43 @@ static struct Player {
     }
 } PLAYER; // NOLINT(cert-err58-cpp)
 
+
+static struct {
+    bool ready = false;
+
+    Music tracks[6] = {0};
+    float volumes[6] = {0};
+    bool on[6] = {false};
+
+    void init() {
+        char fname[32];
+        for (int i = 0; i < 5; ++i) {
+            std::snprintf(fname, 32, ASSETS "%d_bg0.mp3", i);
+            tracks[i] = LoadMusicStream(fname);
+        }
+        for (int i = 0; i < 5; ++i) {
+            PlayMusicStream(tracks[i]);
+        }
+
+        ready = true;
+    }
+
+    void update() {
+        if (!ready) return;
+
+        for (int i = 0; i < 5; ++i) {
+            on[i] = i <= PLAYER.hp / 2;
+        }
+        for (int i = 0; i < 5; ++i) {
+            volumes[i] = coerceIn(volumes[i] + (on[i] ? 0.005f : -0.005f), 0.f, 1.f);
+            SetMusicVolume(tracks[i], volumes[i]);
+        }
+        for (int i = 0; i < 5; ++i) {
+            UpdateMusicStream(tracks[i]);
+        }
+    }
+} MUSIC;
+
 struct Bullet {
     int goodPercent;
     float lifetime;
@@ -377,6 +414,8 @@ void startLevel00() {
 //        MUSIC = LoadMusicStream(ASSETS "01_metro.mp3");
 //        PlayMusicStream(MUSIC);
 
+        MUSIC.init();
+
         MESSAGE.add("PRESS ZXCVBNNM to test sound", []() {
             startLevel01();
         });
@@ -402,6 +441,8 @@ void update() {
 
     MESSAGE.update();
 //    if (MUSIC.sampleCount) UpdateMusicStream(MUSIC);
+
+    MUSIC.update();
 
     bool anyAlive = false;
     for (auto &obj : BULLETS) {

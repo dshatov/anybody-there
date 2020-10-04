@@ -1325,7 +1325,7 @@ void UpdateMusicStream(Music music)
         }
         else sampleLeft -= samplesCount;
 
-        if (sampleLeft <= 0)
+        if (sampleLeft < 0)
         {
             streamEnding = true;
             break;
