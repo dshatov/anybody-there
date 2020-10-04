@@ -4,8 +4,9 @@
 #include <vector>
 #include <string>
 #include <cmath>
-#include <algorithm>
+// #include <algorithm>
 #include <queue>
+#include <functional>
 
 #ifdef PLATFORM_WEB
 #include <emscripten/emscripten.h>
@@ -489,7 +490,7 @@ bool trans03() {
     std::snprintf(msg, 32, "Welcome to LEVEL %d!", 1 + LVL);
     MESSAGES.add(msg, startLevel01);
     return true;
-};
+}
 
 void trans02() {
     std::swap(PALETTE, NEXT_PALETTE);
@@ -513,7 +514,7 @@ bool trans01() {
     MESSAGES.add("...............", trans02);
 
     return true;
-};
+}
 
 void startTransitionLevel() {
     ALL_BULLETS_TOUCHED = false;
