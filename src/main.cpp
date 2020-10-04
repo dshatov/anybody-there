@@ -17,13 +17,15 @@ static constexpr int WINDOW_WIDTH = 960;
 static constexpr int WINDOW_HEIGHT = 540;
 static constexpr int LOGIC_SCREEN_WIDTH = WINDOW_WIDTH * 2;
 static constexpr int LOGIC_SCREEN_HEIGHT = WINDOW_HEIGHT * 2;
-static const Vector2 LOGIC_SCREEN_CENTER = {(float) LOGIC_SCREEN_WIDTH / 2, (float) LOGIC_SCREEN_HEIGHT / 2};
+static const Vector2 LOGIC_SCREEN_CENTER = {
+    (float) LOGIC_SCREEN_WIDTH / 2,
+    (float) LOGIC_SCREEN_HEIGHT / 2
+};
 
 static std::vector<std::function<bool(void)> > CALLBACKS;
 
 static Sound UP_SFX[10];
 static Sound DOWN_SFX[10];
-//static Music MUSIC;
 
 static RenderTexture2D screen;
 
@@ -90,6 +92,7 @@ static Palette *PALETTE = &PALETTES[1];
 static Palette *NEXT_PALETTE = &PALETTES[0];
 static float TRANSITION_LIFETIME;
 static float TRANSITION2_LIFETIME;
+static int LVL = 0;
 
 static struct Player {
     Vector2 pos = LOGIC_SCREEN_CENTER;
@@ -143,10 +146,6 @@ static struct Player {
         DrawLineBezier(pos, LOGIC_SCREEN_CENTER, chainThickness, PALETTE->playerBody);
         DrawCircleV(pos, radius(), PALETTE->playerBody);
         DrawCircleV(pos, float(5 + additRadius), PALETTE->playerHeart);
-
-        char hps[16];
-        std::snprintf(hps, 16, "HP = %d", hp);
-        DrawText(hps, 300, 300, 30, ORANGE); // TODO remove
     };
 
     void touch(bool good) {
@@ -162,9 +161,9 @@ static struct Player {
 static struct {
     bool ready = false;
 
-    Music tracks[6] = {0};
-    float volumes[6] = {0};
-    bool on[6] = {false};
+    Music tracks[5] = {0};
+    float volumes[5] = {0};
+    bool on[5] = {false};
 
     void init() {
         char fname[32];
@@ -172,8 +171,8 @@ static struct {
             std::snprintf(fname, 32, ASSETS "%d_bg0.mp3", i);
             tracks[i] = LoadMusicStream(fname);
         }
-        for (int i = 0; i < 5; ++i) {
-            PlayMusicStream(tracks[i]);
+        for (auto &track : tracks) {
+            PlayMusicStream(track);
         }
 
         ready = true;
@@ -182,15 +181,27 @@ static struct {
     void update() {
         if (!ready) return;
 
+        float pos = GetMusicTimePlayed(tracks[0]);
+        float len = GetMusicTimeLength(tracks[0]);
+        float diff = std::min(pos, len - pos);
+        float factor = diff > 0.05f
+                       ? 1.0f
+                       : diff / 0.05f;
+
         for (int i = 0; i < 5; ++i) {
             on[i] = i <= PLAYER.hp / 2;
         }
         for (int i = 0; i < 5; ++i) {
-            volumes[i] = coerceIn(volumes[i] + (on[i] ? 0.005f : -0.005f), 0.f, 1.f);
-            SetMusicVolume(tracks[i], volumes[i]);
+            float &vol = volumes[i];
+            vol = coerceIn(vol + (on[i] ? 0.005f : -0.005f), 0.f, 1.f);
+            SetMusicVolume(tracks[i], vol * factor);
+            if (i && pos <= 1e-3f && vol <= 1e-3f) {
+                StopMusicStream(tracks[i]);
+                PlayMusicStream(tracks[i]);
+            }
         }
-        for (int i = 0; i < 5; ++i) {
-            UpdateMusicStream(tracks[i]);
+        for (auto &track : tracks) {
+            UpdateMusicStream(track);
         }
     }
 } MUSIC;
@@ -262,23 +273,27 @@ struct Bullet {
 static std::vector<Bullet> BULLETS;
 
 static struct {
-    bool show = true;
-
-    void toggle() {
-        show = !show;
-    }
+    bool show = false;
 
     void draw() const {
         if (show) {
-            DrawText(
+            char msg[128];
+            std::snprintf(
+                msg, 128,
                 ""
                 "Controls:\n\n"
                 "ARROWS  --  move\n"
-                "ESC  --  exit\n"
+                #ifndef PLATFORM_WEB
                 "F  --  fullscreen\n"
+                #endif
                 "H  --  show help\n"
+                "\n"
+                "\n"
+                "CIRCLE #%d"
                 "",
-                8, 8, 30, PALETTE->helpText);
+                LVL + 1
+            );
+            DrawText(msg, 8, 8, 30, PALETTE->helpText);
         }
     }
 } HELP;
@@ -361,17 +376,27 @@ void startTransitionLevel() {
     CALLBACKS.emplace_back([]() {
         if (0 <= --TRANSITION_LIFETIME) return false;
 
+        PLAYER.hp = 2;
         CALLBACKS.clear();
-        std::swap(PALETTE, NEXT_PALETTE);
-        TRANSITION2_LIFETIME = 300;
-        Player p;
-        std::swap(p, PLAYER);
+        MESSAGES.add(".");
+        MESSAGES.add("..");
+        MESSAGES.add("...");
+        MESSAGES.add("*** ......llo?");
+        MESSAGES.add("...............", []() {
+            std::swap(PALETTE, NEXT_PALETTE);
+            TRANSITION2_LIFETIME = 300;
+            Player p;
+            std::swap(p, PLAYER);
 
-        CALLBACKS.emplace_back([]() {
-            if (0 <= --TRANSITION2_LIFETIME) return false;
+            ++LVL;
+            CALLBACKS.emplace_back([]() {
+                if (0 <= --TRANSITION2_LIFETIME) return false;
 
-            MESSAGES.add("What next?", startLevel01);
-            return true;
+                char msg[32];
+                std::snprintf(msg, 32, "Welcome to LEVEL %d!", 1 + LVL);
+                MESSAGES.add(msg, startLevel01);
+                return true;
+            });
         });
 
         return true;
@@ -387,6 +412,8 @@ void startLevel(
     int goodPercent,
     const std::function<void(void)> &next
 ) {
+    bulletsCount = coerceIn(bulletsCount, 15, 100);
+    goodPercent = coerceIn(goodPercent, 19, 100);
     ALL_BULLETS_TOUCHED = false;
     BULLETS.clear();
     CALLBACKS.clear();
@@ -448,7 +475,7 @@ void startLevel01() {
         "*** Fine!"
     );
 
-    startLevel(startMsg, endMsg, 30, 100, startLevel02); // TODO
+    startLevel(startMsg, endMsg, 15, 100 - 5 * LVL, startLevel02);
 }
 
 
@@ -460,7 +487,7 @@ void startLevel02() {
     std::vector<std::string> endMsg;
     endMsg.emplace_back("*** Excellent!");
 
-    startLevel(startMsg, endMsg, 15, 70, startLevel03); // TODO
+    startLevel(startMsg, endMsg, 15 + 5 * LVL, 70 - 10 * LVL, startLevel03);
 }
 
 void startLevel03() {
@@ -469,12 +496,12 @@ void startLevel03() {
     startMsg.emplace_back("*** Ready?");
 
     std::vector<std::string> endMsg;
-    endMsg.emplace_back("You have break out of there!");
-    endMsg.emplace_back(".");
-    endMsg.emplace_back("..");
-    endMsg.emplace_back("...");
-    endMsg.emplace_back("*** ...llo?");
-    endMsg.emplace_back("...............");
+    endMsg.emplace_back("*** CONGRATULATIONS!");
+    endMsg.emplace_back(
+        "*** I am free!\n"
+        "*** And you too, right?!"
+    );
+    endMsg.emplace_back("...................");
     endMsg.emplace_back(
         "Thank you for playing!\n"
         "This is a game for Ludum Dare 47 Compo\n"
@@ -482,7 +509,7 @@ void startLevel03() {
     );
     endMsg.emplace_back("Thanks to raysan5 for the excellent RAYLIB library!");
 
-    startLevel(startMsg, endMsg, 30, 60, startTransitionLevel); // TODO
+    startLevel(startMsg, endMsg, 30 + 5 * LVL, 60 - 10 * LVL, startTransitionLevel);
 }
 
 void startLevel00() {
@@ -523,7 +550,7 @@ void startLevel00() {
 
         MUSIC.init();
 
-        MESSAGES.add("PRESS [Z X C V B N N M] to test sound");
+        MESSAGES.add("PRESS [Z X C V B N M] to test sound");
         MESSAGES.add(
             "If you have audio glitches and you are using Chrome,\n"
             "SORRY!"
@@ -553,12 +580,13 @@ void toggleFullscreen() {
 
 void update() {
     if (IsKeyPressed(KEY_F)) toggleFullscreen();
-    if (IsKeyPressed(KEY_R)) startLevel01();
+    else if (IsKeyPressed(KEY_ESCAPE)) {
+        if (IsWindowFullscreen()) {
+            toggleFullscreen();
+        }
+    }
     HELP.show = IsKeyDown(KEY_H);
-
     MESSAGES.update();
-//    if (MUSIC.sampleCount) UpdateMusicStream(MUSIC);
-
     MUSIC.update();
 
     bool anyAlive = false;
@@ -632,20 +660,10 @@ void init() {
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE); // NOLINT(hicpp-signed-bitwise)
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "LD 47 Entry");
     SetTargetFPS(60);
-//    while (!IsKeyPressed(KEY_SPACE)) {
-//        BeginDrawing();
-//        ClearBackground(BLACK);
-//        DrawText(
-//            "PRESS SPACE TO START",
-//            32, 32, 30, WHITE
-//        );
-//        EndDrawing();
-//    }
-
     screen = LoadRenderTexture(LOGIC_SCREEN_WIDTH, LOGIC_SCREEN_HEIGHT);
     SetTextureFilter(screen.texture, FILTER_TRILINEAR);
-    //    toggleFullscreen();
-//    SetExitKey(0);
+    toggleFullscreen();
+    SetExitKey(0);
 }
 
 void updateAndDraw() {
