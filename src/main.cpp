@@ -1,5 +1,6 @@
 #include <raylib.h>
 //#include <bits/stdc++.h>
+#include <iostream>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -284,7 +285,7 @@ static struct {
                 "Controls:\n\n"
                 "ARROWS  --  move\n"
                 #ifndef PLATFORM_WEB
-//                "F  --  fullscreen\n"
+                //                "F  --  fullscreen\n"
                 #endif
                 "H  --  show help\n"
                 "\n"
@@ -361,56 +362,64 @@ void startLevel02();
 
 void startLevel03();
 
-//----------------------------------------------------------------------------------------------------------------------
-
-
-void startTransitionLevel() {
-    ALL_BULLETS_TOUCHED = false;
-    BULLETS.clear();
-    CALLBACKS.clear();
-    MESSAGES.clear();
-
-    TRANSITION_LIFETIME = 360;
-    PLAYER.transition = true;
-
-    CALLBACKS.emplace_back([]() {
-        if (0 <= --TRANSITION_LIFETIME) return false;
-
-        PLAYER.hp = 2;
-        CALLBACKS.clear();
-        MESSAGES.add(".");
-        MESSAGES.add("..");
-        MESSAGES.add("...");
-        MESSAGES.add("*** ......llo?");
-        MESSAGES.add("...............", []() {
-            std::swap(PALETTE, NEXT_PALETTE);
-            TRANSITION2_LIFETIME = 300;
-            Player p;
-            std::swap(p, PLAYER);
-
-            ++LVL;
-            CALLBACKS.emplace_back([]() {
-                if (0 <= --TRANSITION2_LIFETIME) return false;
-
-                char msg[32];
-                std::snprintf(msg, 32, "Welcome to LEVEL %d!", 1 + LVL);
-                MESSAGES.add(msg, startLevel01);
-                return true;
-            });
-        });
-
-        return true;
-    });
-}
+void startTransitionLevel();
 
 //----------------------------------------------------------------------------------------------------------------------
+
+static std::vector<std::vector<std::string> > BEGIN_MESSAGES = { // NOLINT(cert-err58-cpp)
+    {
+        "*** Human! Hello!\n"
+        "*** Oh my God, how lucky I am!\n"
+        "*** I'm glad I'm not alone.",
+
+        "*** I seem to be stuck.\n"
+        "*** Can you help me out, please?",
+
+        "*** Help me collect the power."
+    },
+    {
+        "*** There is still a little more...",
+
+        "*** Try to avoid weakness this time."
+    },
+    {
+        "*** I hope this is the last time...",
+
+        "*** Ready?"
+    }
+};
+
+
+static std::vector<std::vector<std::string> > END_MESSAGES = { // NOLINT(cert-err58-cpp)
+    {
+        "*** Fine!"
+    },
+    {
+        "*** Excellent!"
+    },
+    {
+        "*** CONGRATULATIONS!",
+
+        "*** I am free!\n" // NOLINT(bugprone-suspicious-missing-comma)
+        "*** And you too, right?!",
+
+        "...................",
+
+        "Thank you for playing!\n"
+        "This is a game for Ludum Dare 47 Compo\n"
+        "Programming and music: Dmitry 'FUMYBULB' Shatov",
+
+        "Thanks to raysan5 for the excellent RAYLIB library!"
+    }
+};
+
+static std::function<void(void)> NEXTNEXT;
 
 void startLevel(
-    const std::vector<std::string> &startMsg,
-    const std::vector<std::string> &endMsg,
+    int msgId,
     int bulletsCount,
-    int goodPercent,
-    const std::function<void(void)> &next
+    int goodPercent
+//    const std::function<void(void)> &next
 ) {
     bulletsCount = coerceIn(bulletsCount, 15, 100);
     goodPercent = coerceIn(goodPercent, 19, 100);
@@ -422,11 +431,12 @@ void startLevel(
     std::swap(p, PLAYER);
     PLAYER.pos = p.pos;
 
-    for (int i = 0; i < startMsg.size() - 1; ++i) {
-        MESSAGES.add(startMsg[i]);
+    std::cout << "HELLO" << msgId << std::endl;
+
+    for (int i = 0; i < BEGIN_MESSAGES[msgId].size() - 1; ++i) {
+        MESSAGES.add(BEGIN_MESSAGES[msgId][i]);
     }
-    MESSAGES.add(startMsg.back(), [endMsg, bulletsCount, goodPercent, next]() {
-        auto endMsgCopy = endMsg; // NOLINT(performance-unnecessary-copy-initialization)
+    MESSAGES.add(BEGIN_MESSAGES[msgId].back(), [msgId, bulletsCount, goodPercent]() {
         for (int i = 0; i < bulletsCount; ++i) {
             BULLETS.emplace_back(goodPercent);
             Bullet &obj = BULLETS[BULLETS.size() - 1];
@@ -439,14 +449,13 @@ void startLevel(
             return false;
         });
 
-        CALLBACKS.emplace_back([endMsgCopy, next]() {
-            auto endMsgCopy2 = endMsgCopy;
+        CALLBACKS.emplace_back([msgId]() {
             if (BULLETS.empty()) {
                 CALLBACKS.clear();
-                for (int i = 0; i < endMsgCopy2.size() - 1; ++i) {
-                    MESSAGES.add(endMsgCopy2[i]);
+                for (int i = 0; i < END_MESSAGES[msgId].size() - 1; ++i) {
+                    MESSAGES.add(END_MESSAGES[msgId][i]);
                 }
-                MESSAGES.add(endMsgCopy2.back(), next);
+                MESSAGES.add(END_MESSAGES[msgId].back(), NEXTNEXT);
             }
             return true;
         });
@@ -454,62 +463,67 @@ void startLevel(
 }
 
 void startLevel01() {
-    std::vector<std::string> startMsg;
-    startMsg.emplace_back("*** Hello...");
-    startMsg.emplace_back("*** Anybody?");
-    startMsg.emplace_back(
-        "*** Human! Hello!\n"
-        "*** Oh my God, how lucky I am!\n"
-        "*** I'm glad I'm not alone."
-    );
-    startMsg.emplace_back(
-        "*** I seem to be stuck.\n"
-        "*** Can you help me out, please?"
-    );
-    startMsg.emplace_back(
-        "*** Help me collect the power."
-    );
-
-    std::vector<std::string> endMsg;
-    endMsg.emplace_back(
-        "*** Fine!"
-    );
-
-    startLevel(startMsg, endMsg, 15, 100 - 5 * LVL, startLevel02);
+    NEXTNEXT = startLevel02;
+    startLevel(0, 15, 100 - 5 * LVL); // TODO
 }
 
 
 void startLevel02() {
-    std::vector<std::string> startMsg;
-    startMsg.emplace_back("*** There is still a little more...");
-    startMsg.emplace_back("*** Try to avoid weakness this time.");
-
-    std::vector<std::string> endMsg;
-    endMsg.emplace_back("*** Excellent!");
-
-    startLevel(startMsg, endMsg, 15 + 5 * LVL, 70 - 10 * LVL, startLevel03);
+    NEXTNEXT = startLevel03;
+    startLevel(1, 15 + 5 * LVL, 70 - 10 * LVL);
 }
 
 void startLevel03() {
-    std::vector<std::string> startMsg;
-    startMsg.emplace_back("*** I hope this is the last time...");
-    startMsg.emplace_back("*** Ready?");
+    NEXTNEXT = startTransitionLevel;
+    startLevel(2, 30 + 5 * LVL, 60 - 10 * LVL);
+}
 
-    std::vector<std::string> endMsg;
-    endMsg.emplace_back("*** CONGRATULATIONS!");
-    endMsg.emplace_back(
-        "*** I am free!\n"
-        "*** And you too, right?!"
-    );
-    endMsg.emplace_back("...................");
-    endMsg.emplace_back(
-        "Thank you for playing!\n"
-        "This is a game for Ludum Dare 47 Compo\n"
-        "Programming and music: Dmitry 'FUMYBULB' Shatov"
-    );
-    endMsg.emplace_back("Thanks to raysan5 for the excellent RAYLIB library!");
 
-    startLevel(startMsg, endMsg, 30 + 5 * LVL, 60 - 10 * LVL, startTransitionLevel);
+//----------------------------------------------------------------------------------------------------------------------
+
+bool trans03() {
+    if (0 <= --TRANSITION2_LIFETIME) return false;
+
+    char msg[32];
+    std::snprintf(msg, 32, "Welcome to LEVEL %d!", 1 + LVL);
+    MESSAGES.add(msg, startLevel01);
+    return true;
+};
+
+void trans02() {
+    std::swap(PALETTE, NEXT_PALETTE);
+    TRANSITION2_LIFETIME = 300;
+    Player p;
+    std::swap(p, PLAYER);
+
+    ++LVL;
+    CALLBACKS.emplace_back(trans03);
+}
+
+bool trans01() {
+    if (0 <= --TRANSITION_LIFETIME) return false;
+
+    PLAYER.hp = 2;
+    CALLBACKS.clear();
+    MESSAGES.add(".");
+    MESSAGES.add("..");
+    MESSAGES.add("...");
+    MESSAGES.add("*** ......llo?");
+    MESSAGES.add("...............", trans02);
+
+    return true;
+};
+
+void startTransitionLevel() {
+    ALL_BULLETS_TOUCHED = false;
+    BULLETS.clear();
+    CALLBACKS.clear();
+    MESSAGES.clear();
+
+    TRANSITION_LIFETIME = 360;
+    PLAYER.transition = true;
+
+    CALLBACKS.emplace_back(trans01);
 }
 
 void startLevel00() {
@@ -551,6 +565,7 @@ void startLevel00() {
         MUSIC.init();
 
         MESSAGES.add("PRESS [Z X C V B N M] to test sound");
+#ifdef PLATFORM_WEB
         MESSAGES.add(
             "If you have audio glitches and you are using Chrome,\n"
             "SORRY!"
@@ -560,6 +575,12 @@ void startLevel00() {
             "1. Use Firefox\n"
             "2. Switch between tabs for a while"
         );
+        MESSAGES.add(
+            "Best workaround:\n"
+            "Use NATIVE VERSION for Desktop\n"
+            "It looks like the web version is buggy."
+        );
+#endif
         MESSAGES.add("PRESS [ space ] to start playing", []() {
             startLevel01();
         });
@@ -662,7 +683,9 @@ void init() {
     SetTargetFPS(60);
     screen = LoadRenderTexture(LOGIC_SCREEN_WIDTH, LOGIC_SCREEN_HEIGHT);
     SetTextureFilter(screen.texture, FILTER_TRILINEAR);
+#ifndef PLATFORM_WEB
     toggleFullscreen();
+#endif
     SetExitKey(0);
 }
 
