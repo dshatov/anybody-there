@@ -49,27 +49,80 @@ inline T coerceIn(T v, T from, T to) {
     return v < from ? from : to < v ? to : v;
 }
 
+struct Palette {
+    Color playerHeart;
+    Color playerBody;
+    Color bulletGood;
+    Color bulletBad;
+    Color helpText;
+    Color messageBox;
+    Color messageText;
+    Color messageHint;
+    Color bg;
+};
+
+static Palette PALETTES[] = {
+    {
+        .playerHeart = DARKGRAY,
+        .playerBody = GRAY,
+        .bulletGood = GRAY,
+        .bulletBad = GOLD,
+        .helpText = {255, 203, 0, 192},
+        .messageBox = {240, 51, 65, 192},
+        .messageText = {255, 203, 0, 192},
+        .messageHint = {250, 190, 190, 192},
+        .bg = RED,
+    },
+    {
+        .playerHeart = MAROON,
+        .playerBody = RED,
+        .bulletGood = RED,
+        .bulletBad = SKYBLUE,
+        .helpText = {55, 103, 0, 192},
+        .messageBox = {130, 130, 130, 192},
+        .messageText = {255, 255, 255, 192},
+        .messageHint = {190, 190, 190, 192},
+        .bg = GRAY,
+    }
+};
+
+static Palette *PALETTE = &PALETTES[1];
+static Palette *NEXT_PALETTE = &PALETTES[0];
+static float TRANSITION_LIFETIME;
+static float TRANSITION2_LIFETIME;
+
 static struct Player {
     Vector2 pos = LOGIC_SCREEN_CENTER;
     float additRadius = 0;
     int hp = 0;
     float deltaAddit = 0.3;
+    bool transition = false;
 
     [[nodiscard]] static float radius() {
         return 40.0f;
     }
 
     void update() {
+        float vel = 10;
+        if (!transition) {
+            if (TRANSITION2_LIFETIME <= 0) {
+                if (IsKeyDown(KEY_LEFT)) pos.x -= vel;
+                else if (IsKeyDown(KEY_RIGHT)) pos.x += vel;
+                if (IsKeyDown(KEY_UP)) pos.y -= vel;
+                else if (IsKeyDown(KEY_DOWN)) pos.y += vel;
+            }
+        } else {
+            pos.x += vel;
+            pos.y += vel / 4;
+        }
+
 //        float d = std::sqrt(1 + dist2(LOGIC_SCREEN_CENTER, pos));
 //        float vel = coerceIn(2000.0f / d, 0, 10);
-        float vel = 10;
-        if (IsKeyDown(KEY_LEFT)) pos.x -= vel;
-        else if (IsKeyDown(KEY_RIGHT)) pos.x += vel;
-        if (IsKeyDown(KEY_UP)) pos.y -= vel;
-        else if (IsKeyDown(KEY_DOWN)) pos.y += vel;
 
-        pos.x -= coerceIn(ssqr(pos.x - LOGIC_SCREEN_CENTER.x) / 60000, -30.f, 30.f);
-        pos.y -= coerceIn(ssqr(pos.y - LOGIC_SCREEN_CENTER.y) / 20000, -20.f, 20.f);
+        if (!transition) {
+            pos.x -= coerceIn(ssqr(pos.x - LOGIC_SCREEN_CENTER.x) / 60000, -30.f, 30.f);
+            pos.y -= coerceIn(ssqr(pos.y - LOGIC_SCREEN_CENTER.y) / 20000, -20.f, 20.f);
+        }
 
         additRadius += deltaAddit;
         if (additRadius > 30) {
@@ -83,13 +136,17 @@ static struct Player {
     };
 
     void draw() const {
-        DrawLineBezier(pos, LOGIC_SCREEN_CENTER, 10.0f, RED);
-        DrawCircleV(pos, radius(), RED);
-        DrawCircleV(pos, float(5 + additRadius), MAROON);
+        float chainThickness = 10.0f;
+        if (transition) {
+            chainThickness /= 600 / coerceIn(TRANSITION_LIFETIME - 120, 1.0f, 360.0f);
+        }
+        DrawLineBezier(pos, LOGIC_SCREEN_CENTER, chainThickness, PALETTE->playerBody);
+        DrawCircleV(pos, radius(), PALETTE->playerBody);
+        DrawCircleV(pos, float(5 + additRadius), PALETTE->playerHeart);
 
         char hps[16];
         std::snprintf(hps, 16, "HP = %d", hp);
-        DrawText(hps, 300, 300, 30, ORANGE);
+        DrawText(hps, 300, 300, 30, ORANGE); // TODO remove
     };
 
     void touch(bool good) {
@@ -198,7 +255,7 @@ struct Bullet {
 
     void draw() const {
         if (lifetime < 0) return;
-        DrawCircleV(pos, radius(), good ? RED : SKYBLUE);
+        DrawCircleV(pos, radius(), good ? PALETTE->bulletGood : PALETTE->bulletBad);
     };
 };
 
@@ -213,16 +270,15 @@ static struct {
 
     void draw() const {
         if (show) {
-            static const Color HELP_COLOR = (Color) {255, 203, 0, 192};
             DrawText(
                 ""
                 "Controls:\n\n"
                 "ARROWS  --  move\n"
                 "ESC  --  exit\n"
                 "F  --  fullscreen\n"
-                "H  --  toggle help\n"
+                "H  --  show help\n"
                 "",
-                8, 8, 30, HELP_COLOR);
+                8, 8, 30, PALETTE->helpText);
         }
     }
 } HELP;
@@ -256,23 +312,19 @@ static struct {
     void draw() const {
         if (messages.empty()) return;
 
-        static const Color MESSAGE_COLOR = {255, 255, 255, 192};
-        static const Color MSG_BOX_COLOR = {130, 130, 130, 192};
-        static const Color HINT_COLOR = {190, 190, 190, 192};
-
         static const Rectangle MSG_BOX_RECT = {24, 868, 1872, 188};
 
-        DrawRectangleRounded(MSG_BOX_RECT, 0.3, 32, MSG_BOX_COLOR);
+        DrawRectangleRounded(MSG_BOX_RECT, 0.3, 32, PALETTE->messageBox);
         DrawText(
             messages.front().first.c_str(),
-            56, 900, 30, MESSAGE_COLOR
+            56, 900, 30, PALETTE->messageText
         );
         DrawText(
             "\n\nPress SPACE",
-            1650, 900, 30, HINT_COLOR
+            1650, 900, 30, PALETTE->messageHint
         );
     }
-} MESSAGE; // NOLINT(cert-err58-cpp)
+} MESSAGES; // NOLINT(cert-err58-cpp)
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -296,6 +348,38 @@ void startLevel03();
 
 //----------------------------------------------------------------------------------------------------------------------
 
+
+void startTransitionLevel() {
+    ALL_BULLETS_TOUCHED = false;
+    BULLETS.clear();
+    CALLBACKS.clear();
+    MESSAGES.clear();
+
+    TRANSITION_LIFETIME = 360;
+    PLAYER.transition = true;
+
+    CALLBACKS.emplace_back([]() {
+        if (0 <= --TRANSITION_LIFETIME) return false;
+
+        CALLBACKS.clear();
+        std::swap(PALETTE, NEXT_PALETTE);
+        TRANSITION2_LIFETIME = 300;
+        Player p;
+        std::swap(p, PLAYER);
+
+        CALLBACKS.emplace_back([]() {
+            if (0 <= --TRANSITION2_LIFETIME) return false;
+
+            MESSAGES.add("What next?", startLevel01);
+            return true;
+        });
+
+        return true;
+    });
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
 void startLevel(
     const std::vector<std::string> &startMsg,
     const std::vector<std::string> &endMsg,
@@ -306,14 +390,15 @@ void startLevel(
     ALL_BULLETS_TOUCHED = false;
     BULLETS.clear();
     CALLBACKS.clear();
-    MESSAGE.clear();
+    MESSAGES.clear();
     Player p;
     std::swap(p, PLAYER);
+    PLAYER.pos = p.pos;
 
     for (int i = 0; i < startMsg.size() - 1; ++i) {
-        MESSAGE.add(startMsg[i]);
+        MESSAGES.add(startMsg[i]);
     }
-    MESSAGE.add(startMsg.back(), [endMsg, bulletsCount, goodPercent, next]() {
+    MESSAGES.add(startMsg.back(), [endMsg, bulletsCount, goodPercent, next]() {
         auto endMsgCopy = endMsg; // NOLINT(performance-unnecessary-copy-initialization)
         for (int i = 0; i < bulletsCount; ++i) {
             BULLETS.emplace_back(goodPercent);
@@ -332,9 +417,9 @@ void startLevel(
             if (BULLETS.empty()) {
                 CALLBACKS.clear();
                 for (int i = 0; i < endMsgCopy2.size() - 1; ++i) {
-                    MESSAGE.add(endMsgCopy2[i]);
+                    MESSAGES.add(endMsgCopy2[i]);
                 }
-                MESSAGE.add(endMsgCopy2.back(), next);
+                MESSAGES.add(endMsgCopy2.back(), next);
             }
             return true;
         });
@@ -343,41 +428,65 @@ void startLevel(
 
 void startLevel01() {
     std::vector<std::string> startMsg;
-    startMsg.emplace_back("Hello...");
-    startMsg.emplace_back("Anybody there?");
-    startMsg.emplace_back("LEVEL 1");
+    startMsg.emplace_back("*** Hello...");
+    startMsg.emplace_back("*** Anybody?");
+    startMsg.emplace_back(
+        "*** Human! Hello!\n"
+        "*** Oh my God, how lucky I am!\n"
+        "*** I'm glad I'm not alone."
+    );
+    startMsg.emplace_back(
+        "*** I seem to be stuck.\n"
+        "*** Can you help me out, please?"
+    );
+    startMsg.emplace_back(
+        "*** Help me collect the power."
+    );
 
     std::vector<std::string> endMsg;
-    endMsg.emplace_back("Fine! Next level...");
+    endMsg.emplace_back(
+        "*** Fine!"
+    );
 
-    startLevel(startMsg, endMsg, 30, 100, startLevel02);
+    startLevel(startMsg, endMsg, 30, 100, startLevel02); // TODO
 }
 
 
 void startLevel02() {
     std::vector<std::string> startMsg;
-    startMsg.emplace_back("Well...");
-    startMsg.emplace_back("LEVEL 2");
+    startMsg.emplace_back("*** There is still a little more...");
+    startMsg.emplace_back("*** Try to avoid weakness this time.");
 
     std::vector<std::string> endMsg;
-    endMsg.emplace_back("Fine! Next level...");
+    endMsg.emplace_back("*** Excellent!");
 
-    startLevel(startMsg, endMsg, 15, 50, startLevel03);
+    startLevel(startMsg, endMsg, 15, 70, startLevel03); // TODO
 }
 
 void startLevel03() {
     std::vector<std::string> startMsg;
-    startMsg.emplace_back("Ok dude...");
-    startMsg.emplace_back("LEVEL 3");
+    startMsg.emplace_back("*** I hope this is the last time...");
+    startMsg.emplace_back("*** Ready?");
 
     std::vector<std::string> endMsg;
-    endMsg.emplace_back("YEAAAH...");
+    endMsg.emplace_back("You have break out of there!");
+    endMsg.emplace_back(".");
+    endMsg.emplace_back("..");
+    endMsg.emplace_back("...");
+    endMsg.emplace_back("*** ...llo?");
+    endMsg.emplace_back("...............");
+    endMsg.emplace_back(
+        "Thank you for playing!\n"
+        "This is a game for Ludum Dare 47 Compo\n"
+        "Programming and music: Dmitry 'FUMYBULB' Shatov"
+    );
+    endMsg.emplace_back("Thanks to raysan5 for the excellent RAYLIB library!");
 
-    startLevel(startMsg, endMsg, 30, 30, startLevel01);
+    startLevel(startMsg, endMsg, 30, 60, startTransitionLevel); // TODO
 }
 
 void startLevel00() {
-    MESSAGE.add("Hint: You can press [H]", []() {
+    MESSAGES.add("Press [H] for help", []() {
         InitAudioDevice();
         UP_SFX[0] = LoadSound(ASSETS "1_up01.mp3");
         UP_SFX[1] = LoadSound(ASSETS "2_up02.mp3");
@@ -411,12 +520,20 @@ void startLevel00() {
             if (IsKeyPressed(KEY_M)) PlaySound(UP_SFX[6]);
             return false;
         });
-//        MUSIC = LoadMusicStream(ASSETS "01_metro.mp3");
-//        PlayMusicStream(MUSIC);
 
         MUSIC.init();
 
-        MESSAGE.add("PRESS ZXCVBNNM to test sound", []() {
+        MESSAGES.add("PRESS [Z X C V B N N M] to test sound");
+        MESSAGES.add(
+            "If you have audio glitches and you are using Chrome,\n"
+            "SORRY!"
+        );
+        MESSAGES.add(
+            "Possible workarounds:\n"
+            "1. Use Firefox\n"
+            "2. Switch between tabs for a while"
+        );
+        MESSAGES.add("PRESS [ space ] to start playing", []() {
             startLevel01();
         });
     });
@@ -436,10 +553,10 @@ void toggleFullscreen() {
 
 void update() {
     if (IsKeyPressed(KEY_F)) toggleFullscreen();
-    if (IsKeyPressed(KEY_H)) HELP.toggle();
     if (IsKeyPressed(KEY_R)) startLevel01();
+    HELP.show = IsKeyDown(KEY_H);
 
-    MESSAGE.update();
+    MESSAGES.update();
 //    if (MUSIC.sampleCount) UpdateMusicStream(MUSIC);
 
     MUSIC.update();
@@ -491,13 +608,16 @@ void draw() {
 
     //----------------------------------------------------------------
 
-    ClearBackground(DARKGRAY);
+    ClearBackground(PALETTE->bg);
     PLAYER.draw();
     for (auto &obj : BULLETS) {
         obj.draw();
     }
+    if (0 < TRANSITION2_LIFETIME) {
+        DrawCircleV(LOGIC_SCREEN_CENTER, TRANSITION2_LIFETIME * 10, PALETTE->playerBody);
+    }
     HELP.draw();
-    MESSAGE.draw();
+    MESSAGES.draw();
 
     //----------------------------------------------------------------
 
