@@ -67,31 +67,31 @@ struct Palette {
 
 static Palette PALETTES[] = {
     {
-        .playerHeart = DARKGRAY,
-        .playerBody = GRAY,
-        .bulletGood = GRAY,
+        .playerHeart = { 130, 130, 130, 255 } ,
+        .playerBody = { 170, 170, 170, 255 },
+        .bulletGood = { 170, 170, 170, 255 },
         .bulletBad = GOLD,
-        .helpText = {255, 203, 0, 192},
+        .helpText = {255, 255, 255, 222},
         .messageBox = {240, 51, 65, 192},
-        .messageText = {255, 203, 0, 192},
-        .messageHint = {250, 190, 190, 192},
-        .bg = RED,
+        .messageText = {250, 240, 240, 232},
+        .messageHint = {250, 240, 240, 232},
+        .bg = { 220, 61, 75, 255 },
     },
     {
         .playerHeart = MAROON,
-        .playerBody = RED,
-        .bulletGood = RED,
+        .playerBody = { 220, 61, 75, 255 },
+        .bulletGood = { 220, 61, 75, 255 },
         .bulletBad = SKYBLUE,
-        .helpText = {55, 103, 0, 192},
+        .helpText = {255, 255, 255, 222},
         .messageBox = {130, 130, 130, 192},
-        .messageText = {255, 255, 255, 192},
-        .messageHint = {190, 190, 190, 192},
-        .bg = GRAY,
+        .messageText = {250, 240, 240, 232},
+        .messageHint = {250, 240, 240, 232},
+        .bg = { 170, 170, 170, 255 },
     }
 };
 
-static Palette *PALETTE = &PALETTES[1];
-static Palette *NEXT_PALETTE = &PALETTES[0];
+static Palette *PALETTE = &PALETTES[0];
+static Palette *NEXT_PALETTE = &PALETTES[1];
 static float TRANSITION_LIFETIME;
 static float TRANSITION2_LIFETIME;
 static int LVL = 0;
@@ -275,7 +275,7 @@ struct Bullet {
 static std::vector<Bullet> BULLETS;
 
 static struct {
-    bool show = false;
+    bool show = true;
 
     void draw() const {
         if (show) {
@@ -296,7 +296,7 @@ static struct {
                 "",
                 LVL + 1
             );
-            DrawText(msg, 8, 8, 30, PALETTE->helpText);
+            DrawText(msg, 24, 24, 60, PALETTE->helpText);
         }
     }
 } HELP;
@@ -377,12 +377,14 @@ static std::vector<std::vector<std::string> > BEGIN_MESSAGES = { // NOLINT(cert-
         "*** I seem to be stuck.\n"
         "*** Can you help me out, please?",
 
-        "*** Help me collect the power."
+        "*** Help me COLLECT the POWER.",
+        "*** I'm talking about these flying RED ORBS."
     },
     {
         "*** There is still a little more...",
 
-        "*** Try to avoid weakness this time."
+        "*** Try to avoid WEAKNESS this time.\n"
+        "*** I mean these spheres of a different color."
     },
     {
         "*** I hope this is the last time...",
@@ -439,6 +441,7 @@ void startLevel(
         MESSAGES.add(BEGIN_MESSAGES[msgId][i]);
     }
     MESSAGES.add(BEGIN_MESSAGES[msgId].back(), [msgId, bulletsCount, goodPercent]() {
+        HELP.show = false;
         for (int i = 0; i < bulletsCount; ++i) {
             BULLETS.emplace_back(goodPercent);
             Bullet &obj = BULLETS[BULLETS.size() - 1];
@@ -498,6 +501,10 @@ void trans02() {
     Player p;
     std::swap(p, PLAYER);
 
+    if (!LVL) {
+        BEGIN_MESSAGES[0].pop_back();
+        BEGIN_MESSAGES[1].pop_back();
+    }
     ++LVL;
     CALLBACKS.emplace_back(trans03);
 }
@@ -609,7 +616,7 @@ void update() {
         }
     }
 #endif
-    HELP.show = IsKeyDown(KEY_H);
+    if (IsKeyPressed(KEY_H)) HELP.show = !HELP.show;
     MESSAGES.update();
     MUSIC.update();
 
